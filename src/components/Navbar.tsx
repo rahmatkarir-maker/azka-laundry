@@ -15,7 +15,7 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const quickWaUrl = buildWhatsAppUrl(
-    'Halo Azka Laundry Ulee Kareng, saya ingin menanyakan info layanan dan jadwal laundry.'
+    'Halo Azka Laundry, saya ingin bertanya tentang layanan laundry.'
   );
 
   return (

@@ -198,11 +198,18 @@ export default function OrderFormSection({
                 />
                 <div>
                   <p className="font-semibold text-[#0F172A]">
-                    WhatsApp Resmi (Sementara)
+                    WhatsApp Resmi
                   </p>
-                  <p className="mt-0.5 font-mono tabular-nums text-slate-600">
+                  <a
+                    href={buildWhatsAppUrl(
+                      'Halo Azka Laundry, saya ingin bertanya tentang layanan laundry.'
+                    )}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-0.5 inline-block font-mono tabular-nums text-[#0284C7] underline-offset-4 hover:underline"
+                  >
                     {WHATSAPP_DISPLAY}
-                  </p>
+                  </a>
                 </div>
               </div>
             </div>

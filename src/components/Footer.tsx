@@ -1,8 +1,8 @@
 import { Clock, MapPin, MessageCircle, WashingMachine } from 'lucide-react';
 import {
   BRAND_INFO,
+  WHATSAPP_DIRECT_URL,
   WHATSAPP_DISPLAY,
-  buildWhatsAppUrl,
 } from '../data/laundryData';
 
 const FOOTER_LINKS = [
@@ -16,9 +16,7 @@ const FOOTER_LINKS = [
 ];
 
 export default function Footer() {
-  const floatingWaUrl = buildWhatsAppUrl(
-    'Halo Azka Laundry Ulee Kareng, saya ingin bertanya atau memesan layanan laundry.'
-  );
+  const floatingWaUrl = WHATSAPP_DIRECT_URL;
 
   return (
     <>

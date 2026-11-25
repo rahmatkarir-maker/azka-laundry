@@ -1,9 +1,9 @@
 /**
  * Konfigurasi utama dan data layanan AZKA LAUNDRY
- * Ganti nomor WhatsApp di bawah ini dengan nomor resmi outlet saat beroperasi.
  */
-export const WHATSAPP_NUMBER = '6281234567890';
-export const WHATSAPP_DISPLAY = '0812-3456-7890';
+export const WHATSAPP_NUMBER = '6285352479910';
+export const WHATSAPP_DISPLAY = '0853-5247-9910';
+export const WHATSAPP_DIRECT_URL = `https://wa.me/${WHATSAPP_NUMBER}`;
 
 export const BRAND_INFO = {
   name: 'AZKA LAUNDRY',
