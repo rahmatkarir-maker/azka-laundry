@@ -1,0 +1,6 @@
+{
+  "name": "Azka Laundry — Ulee Kareng, Banda Aceh",
+  "description": "Jasa laundry kiloan, setrika, bed cover, dan antar-jemput terpercaya di Ulee Kareng, Banda Aceh. Bersih, rapi, wangi, dan tepat waktu.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

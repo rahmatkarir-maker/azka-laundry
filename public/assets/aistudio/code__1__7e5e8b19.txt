@@ -1,0 +1,70 @@
+Buatkan website landing page modern, bersih, responsif (mobile-first), dan profesional untuk UMKM jasa laundry bernama "AZKA LAUNDRY" di Ulee Kareng, Banda Aceh.
+
+Gunakan React + Tailwind CSS dengan ikon dari Lucide React.
+
+### Identitas & Gaya Desain
+- Nama Brand: AZKA LAUNDRY
+- Tagline: "Kami Siap Sedia Melayani Anda"
+- Nilai Utama: Bersih • Rapi • Wangi • Tepat Waktu
+- Palet Warna: Dominan putih bersih, biru langit cerah (#0EA5E9), biru navy tua (#0F172A) untuk teks agar kontras, dan aksen hijau toska/mint lembut untuk kesan higienis dan segar.
+- Nuansa Visual: Modern, terpercaya, ramah, rapi, dengan kartu (card) bersudut membulat, bayangan lembut, dan animasi transisi halus.
+
+### Struktur Bagian (Sections) Website
+1. **Navbar (Sticky)**
+   - Logo teks + ikon gelembung/mesin cuci: AZKA LAUNDRY.
+   - Menu navigasi: Beranda, Layanan, Proses Kerja, Kalkulator Harga, Untuk Siapa, Tentang Kami.
+   - Tombol CTA utama: "Pesan via WhatsApp".
+
+2. **Hero Section**
+   - Badge lokasi: "Ulee Kareng, Banda Aceh"
+   - Headline: "Cucian Bersih, Rapi, Wangi & Tepat Waktu — Tanpa Repot."
+   - Subheadline: "Azka Laundry — Kami Siap Sedia Melayani Anda. Solusi laundry kiloan terpercaya untuk keluarga, pekerja, mahasiswa, dan penginapan di sekitar Ulee Kareng."
+   - 2 Tombol CTA: "Pesan Antar-Jemput" (scroll ke form order) & "Hitung Estimasi Biaya" (scroll ke kalkulator).
+   - 4 Highlight kepercayaan singkat: Pencatatan & Label Aman, Pemisahan Cucian, Notifikasi WhatsApp, Garansi Keluhan.
+
+3. **Daftar Layanan (6 Kartu Interaktif)**
+   - **Cuci + Setrika Reguler**: Layanan utama pakaian sehari-hari, estimasi 2–3 hari. (Tandai sebagai "Paling Populer")
+   - **Cuci Kering Lipat**: Pilihan ekonomis bagi pelanggan tanpa kebutuhan setrika.
+   - **Layanan Express**: Pengerjaan prioritas dengan kuota terbatas dan biaya tambahan.
+   - **Setrika Saja**: Khusus pakaian bersih yang ingin dirapikan dan wangi.
+   - **Barang Rumah Tangga**: Bed cover dan selimut (dihitung berdasarkan ukuran & kondisi).
+   - **Antar-Jemput**: Layanan praktis berdasarkan area jangkauan, jadwal, dan minimum transaksi.
+   - Tambahkan catatan kecil: *"Tarif tertera bersifat estimasi awal dan dapat disesuaikan dengan ketentuan lokasi."*
+
+4. **Kalkulator Estimasi Harga Interaktif**
+   - Pengguna bisa memilih jenis layanan (Cuci + Setrika Reguler misal Rp7.000/kg, Cuci Kering Lipat Rp5.000/kg, Setrika Saja Rp5.000/kg, Express Rp12.000/kg, atau Bed Cover Rp25.000/pcs), mengatur jumlah kg/pcs dengan slider atau tombol +/-, serta mencentang opsi "Butuh Antar-Jemput".
+   - Tampilkan total estimasi harga secara real-time + estimasi waktu selesai.
+   - Sertakan tombol "Kirim Pesanan Ini ke WhatsApp" yang otomatis menyusun teks pesan WhatsApp berisi rincian layanan dan estimasi harga.
+
+5. **Standar Proses Kami (6 Langkah Teratur)**
+   Tampilkan dalam bentuk timeline/stepper visual yang rapi agar pelanggan yakin pakaian tidak tertukar:
+   1. Timbang & Catat pesanan dengan transparan
+   2. Beri Label khusus pada setiap pesanan
+   3. Pisahkan cucian sesuai kebutuhan dan warna/bahan
+   4. Periksa hasil kebersihan dan kerapian
+   5. Kemas rapi dan wangi
+   6. Informasikan pelanggan via WhatsApp saat cucian siap diambil/diantar
+
+6. **Layanan Sesuai Kebutuhan Anda (Segmen Pelanggan)**
+   Buat 4 kartu tab atau grid:
+   - **Keluarga Sekitar**: Cucian harian rutin, selimut, dan bed cover.
+   - **Pekerja / ASN**: Hemat waktu, pakaian kerja rapi, tersedia layanan express & paket mingguan.
+   - **Mahasiswa / Penghuni Kos**: Harga terjangkau, praktis, tersedia paket hemat kiloan.
+   - **Penginapan / Homestay**: Pencucian berkala sprei, sarung bantal, dan handuk dengan sistem kerja sama/kontrak.
+
+7. **Tentang Kami (Visi, Misi & Komitmen Garansi)**
+   - **Visi**: Menjadi layanan laundry lokal yang terpercaya, mudah dijangkau, dan dikenal karena kebersihan, kerapian, serta ketepatan waktu.
+   - **Misi**: Memberikan hasil cucian bersih dan rapi; menjaga pakaian pelanggan dengan proses teratur; melayani dengan ramah dan transparan; mengembangkan layanan praktis dan tepat waktu.
+   - Kotak khusus **"Jaminan Layanan"**: Penekanan bahwa Azka Laundry mengutamakan kualitas, keamanan pakaian agar tidak tertukar, serta garansi penanganan keluhan yang responsif.
+
+8. **Formulir Pemesanan / Jemput Cucian (Terhubung WhatsApp)**
+   - Input: Nama Pelanggan, Nomor WhatsApp, Area/Alamat di Ulee Kareng, Pilihan Layanan, Catatan Khusus (misal: pakaian putih dipisah / alergi pewangi tertentu).
+   - Saat tombol submit diklik, buka link `https://wa.me/6281234567890?text=...` (gunakan nomor placeholder yang mudah diganti di kode) dengan format pesan WhatsApp yang rapi.
+
+9. **Footer**
+   - Nama brand, tagline, dan nilai utama (Bersih • Rapi • Wangi • Tepat Waktu).
+   - Alamat: Kawasan Ulee Kareng, Banda Aceh (Alamat lengkap ruko akan segera diumumkan).
+   - Jam Operasional: Setiap Hari, 08.00 – 21.00 WIB (Estimasi).
+   - Tombol WhatsApp mengambang (floating button) di pojok kanan bawah.
+
+Pastikan seluruh teks menggunakan Bahasa Indonesia yang natural, meyakinkan, dan rapi tanpa teks Lorem Ipsum.
