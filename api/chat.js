@@ -1,33 +1,11 @@
-import type { IncomingMessage, ServerResponse } from 'http';
-
-interface ChatHistoryItem {
-  role: 'user' | 'assistant';
-  content: string;
-}
-
-interface ChatRequestPayload {
-  message?: unknown;
-  sessionId?: unknown;
-  history?: unknown;
-}
-
-type VercelLikeReq = IncomingMessage & {
-  body?: ChatRequestPayload | string;
-};
-
-type VercelLikeRes = ServerResponse & {
-  status?: (code: number) => VercelLikeRes;
-  json?: (data: unknown) => void;
-};
-
 const MAX_MESSAGE_LENGTH = 2000;
 const MAX_SESSION_ID_LENGTH = 120;
 const MAX_HISTORY_ITEMS = 10;
 const MAX_BODY_BYTES = 32 * 1024;
 const WEBHOOK_TIMEOUT_MS = 28000;
 
-function isDisallowedHostname(hostname: string): boolean {
-  const host = hostname.toLowerCase().replace(/^\[|\]$/g, '');
+function isDisallowedHostname(hostname) {
+  const host = String(hostname || '').toLowerCase().replace(/^\[|\]$/g, '');
   if (
     host === 'localhost' ||
     host === '0.0.0.0' ||
@@ -40,7 +18,8 @@ function isDisallowedHostname(hostname: string): boolean {
 
   const ipv4Match = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
   if (ipv4Match) {
-    const [a, b] = [Number(ipv4Match[1]), Number(ipv4Match[2])];
+    const a = Number(ipv4Match[1]);
+    const b = Number(ipv4Match[2]);
     if (
       a === 127 ||
       a === 10 ||
@@ -60,7 +39,7 @@ function isDisallowedHostname(hostname: string): boolean {
   return false;
 }
 
-function getConfiguredWebhookUrl(): URL | null {
+function getConfiguredWebhookUrl() {
   const rawUrl =
     process.env.N8N_WEBHOOK_URL ||
     process.env.N8N_CHAT_WEBHOOK_URL ||
@@ -82,8 +61,8 @@ function getConfiguredWebhookUrl(): URL | null {
   }
 }
 
-function parseNdjsonStream(rawText: string): string | null {
-  const lines = rawText
+function parseNdjsonStream(rawText) {
+  const lines = String(rawText || '')
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean);
@@ -92,19 +71,21 @@ function parseNdjsonStream(rawText: string): string | null {
     return null;
   }
 
-  const chunks: string[] = [];
+  const chunks = [];
   let parsedAnyJson = false;
 
   for (const line of lines) {
     try {
-      const item = JSON.parse(line) as Record<string, unknown>;
+      const item = JSON.parse(line);
       parsedAnyJson = true;
-      if (item.type === 'item' && typeof item.content === 'string') {
-        chunks.push(item.content);
-      } else if (typeof item.output === 'string' && item.output.trim()) {
-        chunks.push(item.output);
-      } else if (typeof item.text === 'string' && item.text.trim()) {
-        chunks.push(item.text);
+      if (item && typeof item === 'object') {
+        if (item.type === 'item' && typeof item.content === 'string') {
+          chunks.push(item.content);
+        } else if (typeof item.output === 'string' && item.output.trim()) {
+          chunks.push(item.output);
+        } else if (typeof item.text === 'string' && item.text.trim()) {
+          chunks.push(item.text);
+        }
       }
     } catch {
       // Ignore non-JSON lines
@@ -117,7 +98,7 @@ function parseNdjsonStream(rawText: string): string | null {
   return null;
 }
 
-function extractReplyFromN8nPayload(payload: unknown, depth = 0): string | null {
+function extractReplyFromN8nPayload(payload, depth = 0) {
   if (depth > 5 || payload == null) {
     return null;
   }
@@ -136,7 +117,6 @@ function extractReplyFromN8nPayload(payload: unknown, depth = 0): string | null 
   }
 
   if (typeof payload === 'object') {
-    const record = payload as Record<string, unknown>;
     const candidateKeys = [
       'output',
       'reply',
@@ -149,7 +129,7 @@ function extractReplyFromN8nPayload(payload: unknown, depth = 0): string | null 
       'result',
     ];
     for (const key of candidateKeys) {
-      const value = record[key];
+      const value = payload[key];
       if (typeof value === 'string' && value.trim()) {
         return value.trim();
       }
@@ -157,14 +137,14 @@ function extractReplyFromN8nPayload(payload: unknown, depth = 0): string | null 
 
     const nestedKeys = ['json', 'data', 'body', 'payload', 'result'];
     for (const key of nestedKeys) {
-      if (record[key] && typeof record[key] === 'object') {
-        const nested = extractReplyFromN8nPayload(record[key], depth + 1);
+      if (payload[key] && typeof payload[key] === 'object') {
+        const nested = extractReplyFromN8nPayload(payload[key], depth + 1);
         if (nested) return nested;
       }
     }
 
     const ignoredKeys = new Set(['status', 'code', 'type', 'id', 'sessionId', 'action']);
-    for (const [key, value] of Object.entries(record)) {
+    for (const [key, value] of Object.entries(payload)) {
       if (!ignoredKeys.has(key) && typeof value === 'string' && value.trim().length > 1) {
         return value.trim();
       }
@@ -174,8 +154,17 @@ function extractReplyFromN8nPayload(payload: unknown, depth = 0): string | null 
   return null;
 }
 
-function buildFallbackReply(userMessage: string): string {
-  const lower = userMessage.toLowerCase();
+function isDefaultN8nAckMessage(text) {
+  const lower = String(text || '').trim().toLowerCase();
+  return (
+    lower === 'workflow was started' ||
+    lower === 'workflow got started' ||
+    lower === 'webhook received'
+  );
+}
+
+function buildFallbackReply(userMessage) {
+  const lower = String(userMessage || '').toLowerCase();
 
   if (
     lower.includes('harga') ||
@@ -219,12 +208,30 @@ function buildFallbackReply(userMessage: string): string {
   return 'Terima kasih telah menghubungi Azka Laundry Ulee Kareng! Anda dapat menanyakan tarif layanan, jadwal antar-jemput, layanan express, atau langsung memesan lewat WhatsApp resmi kami di 0853-5247-9910.';
 }
 
-function sendJson(res: VercelLikeRes, statusCode: number, data: unknown): void {
+function buildAuthHeaders() {
+  const headers = {
+    Accept: 'application/json, text/plain',
+  };
+  const authToken = (process.env.N8N_WEBHOOK_AUTH_TOKEN || '').trim();
+  const authHeaderName = (process.env.N8N_WEBHOOK_AUTH_HEADER || '').trim();
+  if (authToken) {
+    if (authHeaderName && authHeaderName.toLowerCase() !== 'authorization') {
+      headers[authHeaderName] = authToken;
+    } else {
+      headers['Authorization'] = authToken.toLowerCase().startsWith('bearer ')
+        ? authToken
+        : `Bearer ${authToken}`;
+    }
+  }
+  return headers;
+}
+
+function sendJson(res, statusCode, data) {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.setHeader('Cache-Control', 'no-store');
   if (typeof res.status === 'function' && typeof res.json === 'function') {
     const chained = res.status(statusCode);
-    if (typeof chained.json === 'function') {
+    if (chained && typeof chained.json === 'function') {
       chained.json(data);
       return;
     }
@@ -233,19 +240,19 @@ function sendJson(res: VercelLikeRes, statusCode: number, data: unknown): void {
   res.end(JSON.stringify(data));
 }
 
-async function readRequestBody(req: VercelLikeReq): Promise<ChatRequestPayload> {
+async function readRequestBody(req) {
   if (req.body && typeof req.body === 'object') {
     return req.body;
   }
   if (typeof req.body === 'string') {
-    return JSON.parse(req.body) as ChatRequestPayload;
+    return req.body.trim() ? JSON.parse(req.body) : {};
   }
 
-  const chunks: Buffer[] = [];
+  const chunks = [];
   let totalBytes = 0;
 
   for await (const chunk of req) {
-    const buf = typeof chunk === 'string' ? Buffer.from(chunk) : Buffer.from(chunk as Uint8Array);
+    const buf = typeof chunk === 'string' ? Buffer.from(chunk) : Buffer.from(chunk);
     totalBytes += buf.length;
     if (totalBytes > MAX_BODY_BYTES) {
       throw new Error('PAYLOAD_TOO_LARGE');
@@ -254,13 +261,10 @@ async function readRequestBody(req: VercelLikeReq): Promise<ChatRequestPayload> 
   }
 
   const raw = Buffer.concat(chunks).toString('utf8').trim();
-  if (!raw) {
-    return {};
-  }
-  return JSON.parse(raw) as ChatRequestPayload;
+  return raw ? JSON.parse(raw) : {};
 }
 
-export default async function handler(req: VercelLikeReq, res: VercelLikeRes) {
+export default async function handler(req, res) {
   if (req.method === 'GET') {
     sendJson(res, 200, {
       ok: true,
@@ -281,12 +285,12 @@ export default async function handler(req: VercelLikeReq, res: VercelLikeRes) {
     sendJson(res, 405, {
       reply: 'Metode tidak diizinkan.',
       source: 'fallback',
-      error: 'Method Not Allowed',
+      reason: 'method_not_allowed',
     });
     return;
   }
 
-  let parsedBody: ChatRequestPayload;
+  let parsedBody;
   try {
     parsedBody = await readRequestBody(req);
   } catch (err) {
@@ -296,7 +300,7 @@ export default async function handler(req: VercelLikeReq, res: VercelLikeRes) {
         ? 'Pesan terlalu besar. Mohon persingkat pertanyaan Anda.'
         : 'Format permintaan tidak valid.',
       source: 'fallback',
-      error: isTooLarge ? 'Payload too large' : 'Invalid JSON body',
+      reason: isTooLarge ? 'payload_too_large' : 'invalid_json',
     });
     return;
   }
@@ -306,7 +310,7 @@ export default async function handler(req: VercelLikeReq, res: VercelLikeRes) {
     sendJson(res, 400, {
       reply: 'Mohon tulis pesan terlebih dahulu.',
       source: 'fallback',
-      error: 'Pesan tidak boleh kosong.',
+      reason: 'empty_message',
     });
     return;
   }
@@ -315,7 +319,7 @@ export default async function handler(req: VercelLikeReq, res: VercelLikeRes) {
     sendJson(res, 400, {
       reply: 'Pesan terlalu panjang. Mohon persingkat pertanyaan Anda.',
       source: 'fallback',
-      error: 'Pesan melebihi batas maksimum karakter.',
+      reason: 'message_too_long',
     });
     return;
   }
@@ -323,19 +327,17 @@ export default async function handler(req: VercelLikeReq, res: VercelLikeRes) {
   const rawSessionId =
     typeof parsedBody.sessionId === 'string' ? parsedBody.sessionId.trim() : '';
   const sessionId =
-    rawSessionId
-      .replace(/[^a-zA-Z0-9_-]/g, '')
-      .slice(0, MAX_SESSION_ID_LENGTH) || `azka-${Date.now()}`;
+    rawSessionId.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, MAX_SESSION_ID_LENGTH) ||
+    `azka-${Date.now()}`;
 
-  const history: ChatHistoryItem[] = Array.isArray(parsedBody.history)
+  const history = Array.isArray(parsedBody.history)
     ? parsedBody.history
         .filter(
-          (item): item is ChatHistoryItem =>
+          (item) =>
             Boolean(item) &&
             typeof item === 'object' &&
-            ((item as ChatHistoryItem).role === 'user' ||
-              (item as ChatHistoryItem).role === 'assistant') &&
-            typeof (item as ChatHistoryItem).content === 'string'
+            (item.role === 'user' || item.role === 'assistant') &&
+            typeof item.content === 'string'
         )
         .slice(-MAX_HISTORY_ITEMS)
         .map((item) => ({
@@ -349,6 +351,7 @@ export default async function handler(req: VercelLikeReq, res: VercelLikeRes) {
     sendJson(res, 200, {
       reply: buildFallbackReply(rawMessage),
       source: 'fallback',
+      reason: 'webhook_not_configured',
     });
     return;
   }
@@ -357,34 +360,50 @@ export default async function handler(req: VercelLikeReq, res: VercelLikeRes) {
   const timeout = setTimeout(() => controller.abort(), WEBHOOK_TIMEOUT_MS);
 
   try {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      Accept: 'application/json, text/plain',
+    const baseHeaders = buildAuthHeaders();
+    const payloadObj = {
+      action: 'sendMessage',
+      chatInput: rawMessage,
+      message: rawMessage,
+      sessionId,
+      history,
+      source: 'azka-laundry-website',
+      brand: 'AZKA LAUNDRY',
+      location: 'Ulee Kareng, Banda Aceh',
+      timestamp: new Date().toISOString(),
     };
 
-    const authToken = process.env.N8N_WEBHOOK_AUTH_TOKEN?.trim();
-    if (authToken) {
-      headers['Authorization'] = `Bearer ${authToken}`;
-    }
-
-    const response = await fetch(validatedUrl.toString(), {
+    let response = await fetch(validatedUrl.toString(), {
       method: 'POST',
-      headers,
+      headers: {
+        ...baseHeaders,
+        'Content-Type': 'application/json',
+      },
       signal: controller.signal,
-      body: JSON.stringify({
-        action: 'sendMessage',
-        chatInput: rawMessage,
-        message: rawMessage,
-        sessionId,
-        history,
-        source: 'azka-laundry-website',
-        brand: 'AZKA LAUNDRY',
-        location: 'Ulee Kareng, Banda Aceh',
-        timestamp: new Date().toISOString(),
-      }),
+      body: JSON.stringify(payloadObj),
     });
 
-    const contentType = response.headers.get('content-type') ?? '';
+    // If user left n8n Webhook node on default HTTP method GET, automatically retry once via GET
+    if (response.status === 404 || response.status === 405) {
+      const firstErrText = await response.text();
+      if (
+        response.status === 405 ||
+        firstErrText.toLowerCase().includes('not registered') ||
+        firstErrText.toLowerCase().includes('get')
+      ) {
+        const getUrl = new URL(validatedUrl.toString());
+        getUrl.searchParams.set('message', rawMessage);
+        getUrl.searchParams.set('chatInput', rawMessage);
+        getUrl.searchParams.set('sessionId', sessionId);
+        response = await fetch(getUrl.toString(), {
+          method: 'GET',
+          headers: baseHeaders,
+          signal: controller.signal,
+        });
+      }
+    }
+
+    const contentType = response.headers.get('content-type') || '';
     const rawText = await response.text();
 
     if (!response.ok) {
@@ -392,6 +411,7 @@ export default async function handler(req: VercelLikeReq, res: VercelLikeRes) {
       sendJson(res, 200, {
         reply: buildFallbackReply(rawMessage),
         source: 'fallback',
+        reason: `upstream_http_${response.status}`,
       });
       return;
     }
@@ -401,11 +421,12 @@ export default async function handler(req: VercelLikeReq, res: VercelLikeRes) {
       sendJson(res, 200, {
         reply: streamedReply,
         source: 'n8n',
+        reason: 'connected',
       });
       return;
     }
 
-    let parsedPayload: unknown = rawText;
+    let parsedPayload = rawText;
     if (
       contentType.includes('application/json') ||
       rawText.trim().startsWith('{') ||
@@ -419,18 +440,32 @@ export default async function handler(req: VercelLikeReq, res: VercelLikeRes) {
     }
 
     const extractedReply = extractReplyFromN8nPayload(parsedPayload);
+    if (!extractedReply || isDefaultN8nAckMessage(extractedReply)) {
+      if (extractedReply && isDefaultN8nAckMessage(extractedReply)) {
+        console.error(
+          '[api/chat] n8n webhook returned immediate ack ("Workflow was started"). Set Webhook Respond mode to "Using Respond to Webhook Node".'
+        );
+      }
+      sendJson(res, 200, {
+        reply: buildFallbackReply(rawMessage),
+        source: 'fallback',
+        reason: extractedReply ? 'workflow_started_only' : 'empty_n8n_reply',
+      });
+      return;
+    }
+
     sendJson(res, 200, {
-      reply: extractedReply || buildFallbackReply(rawMessage),
-      source: extractedReply ? 'n8n' : 'fallback',
+      reply: extractedReply,
+      source: 'n8n',
+      reason: 'connected',
     });
   } catch (err) {
-    console.error(
-      '[api/chat] Webhook request failed:',
-      err instanceof Error ? err.name : 'UnknownError'
-    );
+    const isTimeout = err instanceof Error && err.name === 'AbortError';
+    console.error('[api/chat] Webhook request failed:', err instanceof Error ? err.name : 'Error');
     sendJson(res, 200, {
       reply: buildFallbackReply(rawMessage),
       source: 'fallback',
+      reason: isTimeout ? 'timeout' : 'network_error',
     });
   } finally {
     clearTimeout(timeout);

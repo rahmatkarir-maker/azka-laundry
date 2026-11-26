@@ -221,6 +221,33 @@ export function buildFallbackReply(userMessage: string): string {
   return 'Terima kasih telah menghubungi Azka Laundry Ulee Kareng! Anda dapat menanyakan tarif layanan, jadwal antar-jemput, layanan express, atau langsung memesan lewat WhatsApp resmi kami di 0853-5247-9910.';
 }
 
+function isDefaultN8nAckMessage(text: string): boolean {
+  const lower = text.trim().toLowerCase();
+  return (
+    lower === 'workflow was started' ||
+    lower === 'workflow got started' ||
+    lower === 'webhook received'
+  );
+}
+
+function buildAuthHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    Accept: 'application/json, text/plain',
+  };
+  const authToken = process.env.N8N_WEBHOOK_AUTH_TOKEN?.trim();
+  const authHeaderName = process.env.N8N_WEBHOOK_AUTH_HEADER?.trim();
+  if (authToken) {
+    if (authHeaderName && authHeaderName.toLowerCase() !== 'authorization') {
+      headers[authHeaderName] = authToken;
+    } else {
+      headers['Authorization'] = authToken.toLowerCase().startsWith('bearer ')
+        ? authToken
+        : `Bearer ${authToken}`;
+    }
+  }
+  return headers;
+}
+
 export async function handleN8nChatRequest(
   rawBody: ChatRequestPayload
 ): Promise<ChatHandlerResult> {
@@ -287,19 +314,14 @@ export async function handleN8nChatRequest(
   const timeout = setTimeout(() => controller.abort(), WEBHOOK_TIMEOUT_MS);
 
   try {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      Accept: 'application/json, text/plain',
-    };
+    const baseHeaders = buildAuthHeaders();
 
-    const authToken = process.env.N8N_WEBHOOK_AUTH_TOKEN?.trim();
-    if (authToken) {
-      headers['Authorization'] = `Bearer ${authToken}`;
-    }
-
-    const response = await fetch(validatedUrl.toString(), {
+    let response = await fetch(validatedUrl.toString(), {
       method: 'POST',
-      headers,
+      headers: {
+        ...baseHeaders,
+        'Content-Type': 'application/json',
+      },
       signal: controller.signal,
       body: JSON.stringify({
         action: 'sendMessage',
@@ -313,6 +335,26 @@ export async function handleN8nChatRequest(
         timestamp: new Date().toISOString(),
       }),
     });
+
+    // If user left n8n Webhook node on default HTTP method GET, retry once via GET
+    if (response.status === 404 || response.status === 405) {
+      const firstErrText = await response.text();
+      if (
+        response.status === 405 ||
+        firstErrText.toLowerCase().includes('not registered') ||
+        firstErrText.toLowerCase().includes('get')
+      ) {
+        const getUrl = new URL(validatedUrl.toString());
+        getUrl.searchParams.set('message', rawMessage);
+        getUrl.searchParams.set('chatInput', rawMessage);
+        getUrl.searchParams.set('sessionId', sessionId);
+        response = await fetch(getUrl.toString(), {
+          method: 'GET',
+          headers: baseHeaders,
+          signal: controller.signal,
+        });
+      }
+    }
 
     const contentType = response.headers.get('content-type') ?? '';
     const rawText = await response.text();
@@ -328,7 +370,6 @@ export async function handleN8nChatRequest(
       };
     }
 
-    // Handle streaming NDJSON responses from n8n Chat Trigger
     const streamedReply = parseNdjsonStream(rawText);
     if (streamedReply) {
       return {
@@ -354,7 +395,12 @@ export async function handleN8nChatRequest(
     }
 
     const extractedReply = extractReplyFromN8nPayload(parsedPayload);
-    if (!extractedReply) {
+    if (!extractedReply || isDefaultN8nAckMessage(extractedReply)) {
+      if (extractedReply && isDefaultN8nAckMessage(extractedReply)) {
+        console.error(
+          '[n8n-chat] n8n webhook returned immediate ack ("Workflow was started"). Set Webhook Respond mode to "Using Respond to Webhook Node".'
+        );
+      }
       return {
         status: 200,
         body: {
