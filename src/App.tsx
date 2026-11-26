@@ -5,6 +5,7 @@
 
 import { useState } from 'react';
 import AboutSection from './components/AboutSection';
+import ChatWidget from './components/ChatWidget';
 import Footer from './components/Footer';
 import Hero from './components/Hero';
 import Navbar from './components/Navbar';
@@ -116,6 +117,7 @@ export default function App() {
       </main>
 
       <Footer />
+      <ChatWidget />
     </div>
   );
 }

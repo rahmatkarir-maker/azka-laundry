@@ -118,20 +118,6 @@ export default function Footer() {
           </div>
         </div>
       </footer>
-
-      {/* Floating WhatsApp Button (compact on mobile to respect sticky height cap) */}
-      <a
-        href={floatingWaUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label="Hubungi Azka Laundry via WhatsApp"
-        className="fixed bottom-5 right-5 z-40 inline-flex h-12 items-center justify-center gap-2 rounded-full bg-teal-600 px-3.5 text-sm font-semibold text-white shadow-lg transition-transform duration-150 hover:scale-[1.03] hover:bg-teal-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-400 sm:px-5"
-      >
-        <MessageCircle className="h-5 w-5 shrink-0" aria-hidden="true" />
-        <span className="hidden whitespace-nowrap sm:inline">
-          Chat WhatsApp
-        </span>
-      </a>
     </>
   );
 }
