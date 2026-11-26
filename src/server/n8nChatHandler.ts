@@ -21,7 +21,7 @@ export interface ChatHandlerResult {
 const MAX_MESSAGE_LENGTH = 2000;
 const MAX_SESSION_ID_LENGTH = 120;
 const MAX_HISTORY_ITEMS = 10;
-const WEBHOOK_TIMEOUT_MS = 25000;
+const WEBHOOK_TIMEOUT_MS = 28000;
 
 function isDisallowedHostname(hostname: string): boolean {
   const host = hostname.toLowerCase().replace(/^\[|\]$/g, '');
@@ -35,7 +35,6 @@ function isDisallowedHostname(hostname: string): boolean {
     return true;
   }
 
-  // Block IPv4 loopback, private, and cloud metadata ranges
   const ipv4Match = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
   if (ipv4Match) {
     const [a, b] = [Number(ipv4Match[1]), Number(ipv4Match[2])];
@@ -51,7 +50,6 @@ function isDisallowedHostname(hostname: string): boolean {
     }
   }
 
-  // Block IPv6 link-local / unique-local prefixes
   if (host.startsWith('fe80:') || host.startsWith('fc') || host.startsWith('fd')) {
     return true;
   }
@@ -59,8 +57,12 @@ function isDisallowedHostname(hostname: string): boolean {
   return false;
 }
 
-function parseValidatedWebhookUrl(rawUrl: string | undefined): URL | null {
-  if (!rawUrl || !rawUrl.trim()) {
+function getConfiguredWebhookUrl(): URL | null {
+  const rawUrl =
+    process.env.N8N_WEBHOOK_URL ||
+    process.env.N8N_CHAT_WEBHOOK_URL ||
+    '';
+  if (!rawUrl.trim()) {
     return null;
   }
   try {
@@ -77,7 +79,50 @@ function parseValidatedWebhookUrl(rawUrl: string | undefined): URL | null {
   }
 }
 
-function extractReplyFromN8nPayload(payload: unknown): string | null {
+export function isN8nWebhookConfigured(): boolean {
+  return getConfiguredWebhookUrl() !== null;
+}
+
+function parseNdjsonStream(rawText: string): string | null {
+  const lines = rawText
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length < 2) {
+    return null;
+  }
+
+  const chunks: string[] = [];
+  let parsedAnyJson = false;
+
+  for (const line of lines) {
+    try {
+      const item = JSON.parse(line) as Record<string, unknown>;
+      parsedAnyJson = true;
+      if (item.type === 'item' && typeof item.content === 'string') {
+        chunks.push(item.content);
+      } else if (typeof item.output === 'string' && item.output.trim()) {
+        chunks.push(item.output);
+      } else if (typeof item.text === 'string' && item.text.trim()) {
+        chunks.push(item.text);
+      }
+    } catch {
+      // Ignore non-JSON lines in stream
+    }
+  }
+
+  if (parsedAnyJson && chunks.length > 0) {
+    return chunks.join('').trim() || null;
+  }
+  return null;
+}
+
+function extractReplyFromN8nPayload(payload: unknown, depth = 0): string | null {
+  if (depth > 5 || payload == null) {
+    return null;
+  }
+
   if (typeof payload === 'string') {
     const trimmed = payload.trim();
     return trimmed || null;
@@ -85,13 +130,13 @@ function extractReplyFromN8nPayload(payload: unknown): string | null {
 
   if (Array.isArray(payload)) {
     for (const item of payload) {
-      const extracted = extractReplyFromN8nPayload(item);
+      const extracted = extractReplyFromN8nPayload(item, depth + 1);
       if (extracted) return extracted;
     }
     return null;
   }
 
-  if (payload && typeof payload === 'object') {
+  if (typeof payload === 'object') {
     const record = payload as Record<string, unknown>;
     const candidateKeys = [
       'output',
@@ -100,7 +145,9 @@ function extractReplyFromN8nPayload(payload: unknown): string | null {
       'message',
       'response',
       'answer',
+      'jawaban',
       'content',
+      'result',
     ];
     for (const key of candidateKeys) {
       const value = record[key];
@@ -108,16 +155,28 @@ function extractReplyFromN8nPayload(payload: unknown): string | null {
         return value.trim();
       }
     }
-    if (record.data) {
-      const nested = extractReplyFromN8nPayload(record.data);
-      if (nested) return nested;
+
+    const nestedKeys = ['json', 'data', 'body', 'payload', 'result'];
+    for (const key of nestedKeys) {
+      if (record[key] && typeof record[key] === 'object') {
+        const nested = extractReplyFromN8nPayload(record[key], depth + 1);
+        if (nested) return nested;
+      }
+    }
+
+    // Last resort: first meaningful non-metadata string value in object
+    const ignoredKeys = new Set(['status', 'code', 'type', 'id', 'sessionId', 'action']);
+    for (const [key, value] of Object.entries(record)) {
+      if (!ignoredKeys.has(key) && typeof value === 'string' && value.trim().length > 1) {
+        return value.trim();
+      }
     }
   }
 
   return null;
 }
 
-function buildFallbackReply(userMessage: string): string {
+export function buildFallbackReply(userMessage: string): string {
   const lower = userMessage.toLowerCase();
 
   if (
@@ -212,10 +271,8 @@ export async function handleN8nChatRequest(
         }))
     : [];
 
-  const envWebhookUrl = process.env.N8N_WEBHOOK_URL;
-  const validatedUrl = parseValidatedWebhookUrl(envWebhookUrl);
+  const validatedUrl = getConfiguredWebhookUrl();
 
-  // If webhook is not configured yet, return helpful Azka Laundry info gracefully
   if (!validatedUrl) {
     return {
       status: 200,
@@ -245,8 +302,9 @@ export async function handleN8nChatRequest(
       headers,
       signal: controller.signal,
       body: JSON.stringify({
-        message: rawMessage,
+        action: 'sendMessage',
         chatInput: rawMessage,
+        message: rawMessage,
         sessionId,
         history,
         source: 'azka-laundry-website',
@@ -260,18 +318,34 @@ export async function handleN8nChatRequest(
     const rawText = await response.text();
 
     if (!response.ok) {
+      console.error('[n8n-chat] Upstream webhook returned HTTP', response.status);
       return {
         status: 200,
         body: {
-          reply:
-            'Maaf, layanan asisten sedang sibuk saat ini. Anda tetap bisa langsung menghubungi kami via WhatsApp di 0853-5247-9910.',
+          reply: buildFallbackReply(rawMessage),
           source: 'fallback',
         },
       };
     }
 
+    // Handle streaming NDJSON responses from n8n Chat Trigger
+    const streamedReply = parseNdjsonStream(rawText);
+    if (streamedReply) {
+      return {
+        status: 200,
+        body: {
+          reply: streamedReply,
+          source: 'n8n',
+        },
+      };
+    }
+
     let parsedPayload: unknown = rawText;
-    if (contentType.includes('application/json') || rawText.trim().startsWith('{') || rawText.trim().startsWith('[')) {
+    if (
+      contentType.includes('application/json') ||
+      rawText.trim().startsWith('{') ||
+      rawText.trim().startsWith('[')
+    ) {
       try {
         parsedPayload = JSON.parse(rawText);
       } catch {
@@ -284,9 +358,8 @@ export async function handleN8nChatRequest(
       return {
         status: 200,
         body: {
-          reply:
-            'Pesan Anda sudah diterima. Untuk respon lebih cepat, silakan hubungi WhatsApp kami di 0853-5247-9910.',
-          source: 'n8n',
+          reply: buildFallbackReply(rawMessage),
+          source: 'fallback',
         },
       };
     }
@@ -298,12 +371,15 @@ export async function handleN8nChatRequest(
         source: 'n8n',
       },
     };
-  } catch {
+  } catch (err) {
+    console.error(
+      '[n8n-chat] Webhook request failed:',
+      err instanceof Error ? err.name : 'UnknownError'
+    );
     return {
       status: 200,
       body: {
-        reply:
-          'Maaf, koneksi ke asisten otomatis sedang mengalami kendala. Silakan coba lagi beberapa saat atau hubungi langsung WhatsApp kami di 0853-5247-9910.',
+        reply: buildFallbackReply(rawMessage),
         source: 'fallback',
       },
     };

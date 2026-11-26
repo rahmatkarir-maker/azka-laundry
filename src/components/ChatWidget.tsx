@@ -48,6 +48,51 @@ function createWelcomeMessage(): ChatMessage {
   };
 }
 
+function buildClientFallbackReply(userMessage: string): string {
+  const lower = userMessage.toLowerCase();
+
+  if (
+    lower.includes('harga') ||
+    lower.includes('tarif') ||
+    lower.includes('biaya') ||
+    lower.includes('berapa')
+  ) {
+    return [
+      'Berikut estimasi tarif awal Azka Laundry Ulee Kareng:',
+      '• Cuci + Setrika Reguler: Rp7.000/kg (2–3 hari)',
+      '• Cuci Kering Lipat: Rp5.000/kg (1–2 hari)',
+      '• Setrika Saja: Rp5.000/kg (1–2 hari)',
+      '• Layanan Express: Rp12.000/kg (6–24 jam, kuota terbatas)',
+      '• Bed Cover / Selimut: mulai Rp25.000/pcs',
+      '',
+      'Untuk pemesanan langsung, silakan klik WhatsApp 0853-5247-9910 di bawah.',
+    ].join('\n');
+  }
+
+  if (
+    lower.includes('jemput') ||
+    lower.includes('antar') ||
+    lower.includes('ceurih') ||
+    lower.includes('pango') ||
+    lower.includes('ilie') ||
+    lower.includes('lambhuk') ||
+    lower.includes('lokasi') ||
+    lower.includes('alamat')
+  ) {
+    return 'Kami melayani antar-jemput di kawasan Ulee Kareng, Banda Aceh (Simpang Tujuh, Ceurih, Ilie, Pango, Lambhuk, dan sekitarnya) sesuai jadwal harian dan minimum transaksi. Anda bisa mengisi Formulir Pemesanan di halaman ini atau langsung chat WhatsApp ke 0853-5247-9910.';
+  }
+
+  if (lower.includes('express') || lower.includes('kilat') || lower.includes('cepat')) {
+    return 'Layanan Express tersedia dengan estimasi pengerjaan 6–24 jam (tarif estimasi Rp12.000/kg) sesuai ketersediaan kuota harian. Silakan konfirmasi kuota hari ini via WhatsApp di 0853-5247-9910.';
+  }
+
+  if (lower.includes('jam') || lower.includes('buka') || lower.includes('operasional')) {
+    return 'Estimasi jam operasional Azka Laundry adalah Setiap Hari pukul 08.00 – 21.00 WIB. Silakan hubungi WhatsApp 0853-5247-9910 untuk penjadwalan jemput cucian.';
+  }
+
+  return 'Terima kasih telah menghubungi Azka Laundry Ulee Kareng! Untuk informasi lebih lanjut atau pemesanan cepat, silakan hubungi WhatsApp resmi kami di 0853-5247-9910.';
+}
+
 export default function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>(() => [
@@ -61,8 +106,13 @@ export default function ChatWidget() {
 
   useEffect(() => {
     if (isOpen) {
-      scrollAnchorRef.current?.scrollIntoView({ behavior: 'smooth' });
       inputRef.current?.focus();
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen) {
+      scrollAnchorRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [isOpen, messages, isSending]);
 
@@ -91,6 +141,7 @@ export default function ChatWidget() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          Accept: 'application/json',
         },
         body: JSON.stringify({
           message: text,
@@ -99,23 +150,18 @@ export default function ChatWidget() {
         }),
       });
 
-      let replyText =
-        'Maaf, kami belum dapat memproses pesan Anda saat ini. Silakan hubungi WhatsApp resmi kami di 0853-5247-9910.';
+      let replyText = '';
+      const contentType = response.headers.get('content-type') ?? '';
 
-      if (response.ok) {
+      if (contentType.includes('application/json')) {
         const data = (await response.json()) as { reply?: unknown };
         if (typeof data.reply === 'string' && data.reply.trim()) {
           replyText = data.reply.trim();
         }
-      } else {
-        try {
-          const errData = (await response.json()) as { reply?: unknown };
-          if (typeof errData.reply === 'string' && errData.reply.trim()) {
-            replyText = errData.reply.trim();
-          }
-        } catch {
-          // Keep default helpful Indonesian message
-        }
+      }
+
+      if (!replyText) {
+        replyText = buildClientFallbackReply(text);
       }
 
       setMessages((prev) => [
@@ -131,10 +177,9 @@ export default function ChatWidget() {
       setMessages((prev) => [
         ...prev,
         {
-          id: `assistant-err-${Date.now()}`,
+          id: `assistant-fallback-${Date.now()}`,
           role: 'assistant',
-          content:
-            'Koneksi terganggu. Anda dapat mencoba mengirim ulang atau langsung chat WhatsApp kami di 0853-5247-9910.',
+          content: buildClientFallbackReply(text),
           time: formatTimeNow(),
         },
       ]);

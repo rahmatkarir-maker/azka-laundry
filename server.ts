@@ -3,7 +3,10 @@ import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
-import { handleN8nChatRequest } from './src/server/n8nChatHandler.ts';
+import {
+  handleN8nChatRequest,
+  isN8nWebhookConfigured,
+} from './src/server/n8nChatHandler.ts';
 
 const PORT = 3000;
 const RATE_LIMIT_WINDOW_MS = 60_000;
@@ -32,6 +35,14 @@ async function startServer() {
   const app = express();
   app.set('trust proxy', 1);
   app.use(express.json({ limit: '32kb' }));
+
+  app.get('/api/chat', (_req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.status(200).json({
+      ok: true,
+      webhookConfigured: isN8nWebhookConfigured(),
+    });
+  });
 
   app.post('/api/chat', async (req, res) => {
     const clientIp = req.ip || 'unknown';
